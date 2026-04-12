@@ -2,64 +2,49 @@ name: weekly-report
 
 on:
   schedule:
-      - cron: '10 0 * * 1'
-        workflow_dispatch:
+    - cron: '10 0 * * 1'
+  workflow_dispatch:
 
-        jobs:
-          weekly-report:
-              runs-on: ubuntu-latest
-                  timeout-minutes: 30
-                      steps:
-                            - uses: actions/checkout@v4
+jobs:
+  weekly-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
 
-                                  - uses: actions/setup-node@v4
-                                          with:
-                                                    node-version: '20'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-                                                          - name: Claude Code install
-                                                                  run: npm install -g @anthropic-ai/claude-code
+      - name: Claude Code install
+        run: npm install -g @anthropic-ai/claude-code
 
-                                                                        - name: DART weekly collect
-                                                                                env:
-                                                                                          DART_API_KEY: ${{ secrets.DART_API_KEY }}
-                                                                                                  run: |
-                                                                                                            START=$(date -d '7 days ago' +%Y%m%d 2>/dev/null || date -v-7d +%Y%m%d)
-                                                                                                                      END=$(date +%Y%m%d)
-                                                                                                                                curl -s "https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_API_KEY}&bgn_de=${START}&end_de=${END}&pblntf_ty=A&page_count=100" -o dart_weekly.json
-                                                                                                                                          python3 -c "
-                                                                                                                                                    import json
-                                                                                                                                                              data = json.load(open('dart_weekly.json'))
-                                                                                                                                                                        items = data.get('list', [])
-                                                                                                                                                                                  result = []
-                                                                                                                                                                                            keywords = ['잠정실적', '배당', '자기주식', '수주', '계약', '합병']
-                                                                                                                                                                                                      for item in items:
-                                                                                                                                                                                                                  t = item.get('report_nm', '')
-                                                                                                                                                                                                                              if any(k in t for k in keywords):
-                                                                                                                                                                                                                                            result.append('- [' + item.get('corp_name','') + '] ' + t + ' (' + item.get('rcept_dt','') + ')')
-                                                                                                                                                                                                                                                      print(chr(10).join(result[:30]) if result else 'no major disclosure this week')
-                                                                                                                                                                                                                                                                " > dart_weekly_summary.txt
-                                                                                                                                                                                                                                                                          cat dart_weekly_summary.txt
-                                                                                                                                                                                                                                                                          
-                                                                                                                                                                                                                                                                                - name: Generate weekly report
-                                                                                                                                                                                                                                                                                        env:
-                                                                                                                                                                                                                                                                                                  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-                                                                                                                                                                                                                                                                                                            NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-                                                                                                                                                                                                                                                                                                                    run: |
-                                                                                                                                                                                                                                                                                                                              DART_DATA=$(cat dart_weekly_summary.txt)
-                                                                                                                                                                                                                                                                                                                                        claude --dangerously-skip-permissions -p "
-                                                                                                                                                                                                                                                                                                                                                  Read Notion hub page(https://www.notion.so/33fcacd2533f81f28e70edda65c9d116) and generate weekly portfolio report, save to Notion DB.
-                                                                                                                                                                                                                                                                                                                                                  
-                                                                                                                                                                                                                                                                                                                                                            This week DART major disclosures:
-                                                                                                                                                                                                                                                                                                                                                                      ${DART_DATA}
-                                                                                                                                                                                                                                                                                                                                                                      
-                                                                                                                                                                                                                                                                                                                                                                                Include in weekly report:
-                                                                                                                                                                                                                                                                                                                                                                                          1. Weekly market summary
-                                                                                                                                                                                                                                                                                                                                                                                                    2. Portfolio sector review (no quantity/avg price, thesis perspective)
-                                                                                                                                                                                                                                                                                                                                                                                                              3. DART-based watchlist upgrade candidates this week
-                                                                                                                                                                                                                                                                                                                                                                                                                        4. Next week key catalysts
-                                                                                                                                                                                                                                                                                                                                                                                                                                  5. Rebalancing review
-                                                                                                                                                                                                                                                                                                                                                                                                                                            6. Action plan (max 5 items)
-                                                                                                                                                                                                                                                                                                                                                                                                                                            
-                                                                                                                                                                                                                                                                                                                                                                                                                                                      Report title format: YYYY-WXX weekly portfolio report
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                Save to briefing DB(f2823ae6-e16b-4606-ad7c-aa2345cda3b6).
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                          "
+      - name: DART weekly collect
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: |
+          END=$(date +%Y%m%d)
+          START=$(date -d '7 days ago' +%Y%m%d)
+          curl -s "https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_API_KEY}&bgn_de=${START}&end_de=${END}&pblntf_ty=A&page_count=100" -o dart_weekly.json
+          python3 - << 'PYEOF'
+          import json
+          data = json.load(open('dart_weekly.json'))
+          items = data.get('list', [])
+          result = []
+          keywords = ['잠정실적', '배당', '자기주식', '수주', '계약']
+          for item in items:
+              t = item.get('report_nm', '')
+              if any(k in t for k in keywords):
+                  result.append('- [' + item.get('corp_name','') + '] ' + t + ' (' + item.get('rcept_dt','') + ')')
+          print('\n'.join(result[:50]) if result else 'no major disclosure this week')
+          PYEOF
+          > dart_weekly_summary.txt
+          cat dart_weekly_summary.txt
+
+      - name: Generate weekly report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: |
+          DART_DATA=$(cat dart_weekly_summary.txt)
+          claude --dangerously-skip-permissions -p "Read Notion hub page(https://www.notion.so/33fcacd2533f81f28e70edda65c9d116) and generate this week portfolio performance report, save to Notion DB. This week DART disclosures: ${DART_DATA}. Include weekly sector analysis and top picks for next week. Save report to 아침 투자 브리핑 DB(f2823ae6-e16b-4606-ad7c-aa2345cda3b6) as weekly report page."
