@@ -47,7 +47,6 @@ jobs:
           dart_data = os.environ.get('DART_DATA', 'no major disclosure')
           today = os.environ.get('TODAY', '')
           print("API KEY (first 10 chars):", api_key[:10] if api_key else 'EMPTY')
-          print("NOTION TOKEN (first 10 chars):", notion_token[:10] if notion_token else 'EMPTY')
           prompt = "당신은 한국 주식 투자 전문가입니다. 오늘 날짜: " + today + "\n오늘 DART 주요 공시:\n" + dart_data + "\n\n다음 구조로 아침 투자 브리핑 유튜브 대본을 작성해주세요:\n[HOOK] 오프닝 (0~15초)\n[INTRO] 소개 + 주제 안내 (15~30초)\n[SECTION 1] 지난주 시장 요약 (30초~2분)\n[SECTION 2] 오늘의 핵심 변수 (2~4분)\n[SECTION 3] 오늘 주목할 종목 5선 (4~6분) - 공시 기반 선정\n[SECTION 4] 오늘 투자 전략 (6~7분)\n[OUTRO] 마무리 + 구독유도 (7~8분)"
           url = "https://api.anthropic.com/v1/messages"
           print("Using model: claude-sonnet-4-5 (Anthropic API)")
@@ -77,8 +76,9 @@ jobs:
           ai_summary = briefing_text[:200].replace('\n', ' ')
           notion_db_id = "f2823ae6e16b4606ad7caa2345cda3b6"
           notion_url = "https://api.notion.com/v1/pages"
-          notion_body = json.dumps({"parent": {"database_id": notion_db_id}, "properties": {"브리핑 제목": {"title": [{"text": {"content": today + " 아침 브리핑"}}]}, "AI 요약": {"rich_text": [{"text": {"content": ai_summary}}]}, "날짜": {"date": {"start": today}}, "상태": {"select": {"name": "초안"}}, "콘텐츠 유형": {"select": {"name": "유튜브 대본"}}}, "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": briefing_text[:2000]}}]}}]}, ensure_ascii=False).encode('utf-8')
-          print("Notion 요청 전송 중... DB ID:", notion_db_id)
+          # Notion API: rich_text content max 1990 chars (safe margin for multibyte)
+          page_content = briefing_text[:1990]
+          notion_body = json.dumps({"parent": {"database_id": notion_db_id}, "properties": {"브리핑 제목": {"title": [{"text": {"content": today + " 아침 브리핑"}}]}, "AI 요약": {"rich_text": [{"text": {"content": ai_summary}}]}, "날짜": {"date": {"start": today}}, "상태": {"select": {"name": "초안"}}, "콘텐츠 유형": {"select": {"name": "유튜브 대본"}}}, "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": page_content}}]}}]}, ensure_ascii=False).encode('utf-8')
           try:
               notion_req = urllib.request.Request(notion_url, data=notion_body, headers={"Authorization": "Bearer " + notion_token, "Content-Type": "application/json", "Notion-Version": "2022-06-28"})
               with urllib.request.urlopen(notion_req) as resp:
