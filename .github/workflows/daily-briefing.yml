@@ -46,8 +46,10 @@ jobs:
           notion_token = os.environ['NOTION_TOKEN']
           dart_data = os.environ.get('DART_DATA', 'no major disclosure')
           today = os.environ.get('TODAY', '')
+          print("API KEY (first 10 chars):", api_key[:10] if api_key else 'EMPTY')
           prompt = "당신은 한국 주식 투자 전문가입니다. 오늘 날짜: " + today + "\n오늘 DART 주요 공시:\n" + dart_data + "\n\n다음 구조로 아침 투자 브리핑 유튜브 대본을 작성해주세요:\n[HOOK] 오프닝 (0~15초)\n[INTRO] 소개 + 주제 안내 (15~30초)\n[SECTION 1] 지난주 시장 요약 (30초~2분)\n[SECTION 2] 오늘의 핵심 변수 (2~4분)\n[SECTION 3] 오늘 주목할 종목 5선 (4~6분) - 공시 기반 선정\n[SECTION 4] 오늘 투자 전략 (6~7분)\n[OUTRO] 마무리 + 구독유도 (7~8분)"
-          url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + api_key
+          url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + api_key
+          print("Using model: gemini-1.5-flash")
           body = json.dumps({"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4000}}).encode()
           briefing_text = None
           for attempt in range(5):
@@ -59,6 +61,9 @@ jobs:
                   print("브리핑 생성 완료 (시도 " + str(attempt+1) + ")")
                   break
               except urllib.error.HTTPError as e:
+                  error_body = e.read().decode('utf-8', errors='replace')
+                  print("HTTP Error " + str(e.code) + ": " + str(e.reason))
+                  print("Error body:", error_body[:500])
                   if e.code == 429:
                       wait = 60 * (attempt + 1)
                       print("429 Too Many Requests - " + str(wait) + "초 대기 후 재시도... (시도 " + str(attempt+1) + "/5)")
