@@ -49,8 +49,8 @@ jobs:
           print("API KEY (first 10 chars):", api_key[:10] if api_key else 'EMPTY')
           prompt = "당신은 한국 주식 투자 전문가입니다. 오늘 날짜: " + today + "\n오늘 DART 주요 공시:\n" + dart_data + "\n\n다음 구조로 아침 투자 브리핑 유튜브 대본을 작성해주세요:\n[HOOK] 오프닝 (0~15초)\n[INTRO] 소개 + 주제 안내 (15~30초)\n[SECTION 1] 지난주 시장 요약 (30초~2분)\n[SECTION 2] 오늘의 핵심 변수 (2~4분)\n[SECTION 3] 오늘 주목할 종목 5선 (4~6분) - 공시 기반 선정\n[SECTION 4] 오늘 투자 전략 (6~7분)\n[OUTRO] 마무리 + 구독유도 (7~8분)"
           url = "https://api.anthropic.com/v1/messages"
-          print("Using model: claude-3-5-sonnet-20241022 (Anthropic API)")
-          body = json.dumps({"model": "claude-3-5-sonnet-20241022", "max_tokens": 4000, "messages": [{"role": "user", "content": prompt}]}).encode()
+          print("Using model: claude-3-5-sonnet-latest (Anthropic API)")
+          body = json.dumps({"model": "claude-3-5-sonnet-latest", "max_tokens": 4000, "messages": [{"role": "user", "content": prompt}]}).encode()
           headers = {"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"}
           briefing_text = None
           for attempt in range(5):
