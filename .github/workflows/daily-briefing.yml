@@ -17,7 +17,7 @@ jobs:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
         run: |
           TODAY=$(date +%Y%m%d)
-          curl -s "https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_API_KEY}&bgn_de=${TODAY}&end_de=${TODAY}&pblntf_ty=A&page_count=40" -o dart_today.json
+          curl -s --max-time 30 --connect-timeout 10 "https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_API_KEY}&bgn_de=${TODAY}&end_de=${TODAY}&pblntf_ty=A&page_count=40" -o dart_today.json || echo '{"list":[]}' > dart_today.json
           python3 - << 'PYEOF'
           import json
           data = json.load(open('dart_today.json'))
@@ -35,29 +35,30 @@ jobs:
 
       - name: Generate briefing
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         run: |
           export DART_DATA=$(cat dart_summary.txt)
           export TODAY=$(date +%Y-%m-%d)
           python3 << 'PYEOF'
           import os, json, urllib.request, urllib.error, time
-          api_key = os.environ['GEMINI_API_KEY']
+          api_key = os.environ['ANTHROPIC_API_KEY']
           notion_token = os.environ['NOTION_TOKEN']
           dart_data = os.environ.get('DART_DATA', 'no major disclosure')
           today = os.environ.get('TODAY', '')
           print("API KEY (first 10 chars):", api_key[:10] if api_key else 'EMPTY')
           prompt = "당신은 한국 주식 투자 전문가입니다. 오늘 날짜: " + today + "\n오늘 DART 주요 공시:\n" + dart_data + "\n\n다음 구조로 아침 투자 브리핑 유튜브 대본을 작성해주세요:\n[HOOK] 오프닝 (0~15초)\n[INTRO] 소개 + 주제 안내 (15~30초)\n[SECTION 1] 지난주 시장 요약 (30초~2분)\n[SECTION 2] 오늘의 핵심 변수 (2~4분)\n[SECTION 3] 오늘 주목할 종목 5선 (4~6분) - 공시 기반 선정\n[SECTION 4] 오늘 투자 전략 (6~7분)\n[OUTRO] 마무리 + 구독유도 (7~8분)"
-          url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=" + api_key
-          print("Using model: gemini-2.5-flash-preview-04-17 (v1beta API)")
-          body = json.dumps({"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4000}}).encode()
+          url = "https://api.anthropic.com/v1/messages"
+          print("Using model: claude-3-5-sonnet-20241022 (Anthropic API)")
+          body = json.dumps({"model": "claude-3-5-sonnet-20241022", "max_tokens": 4000, "messages": [{"role": "user", "content": prompt}]}).encode()
+          headers = {"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"}
           briefing_text = None
           for attempt in range(5):
               try:
-                  req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+                  req = urllib.request.Request(url, data=body, headers=headers)
                   with urllib.request.urlopen(req) as resp:
                       result = json.loads(resp.read())
-                  briefing_text = result['candidates'][0]['content']['parts'][0]['text']
+                  briefing_text = result['content'][0]['text']
                   print("브리핑 생성 완료 (시도 " + str(attempt+1) + ")")
                   break
               except urllib.error.HTTPError as e:
@@ -71,7 +72,7 @@ jobs:
                   else:
                       raise
           if briefing_text is None:
-              raise Exception("5회 재시도 후에도 Gemini API 호출 실패")
+              raise Exception("5회 재시도 후에도 Anthropic API 호출 실패")
           ai_summary = briefing_text[:200].replace('\n', ' ')
           notion_db_id = "f2823ae6e16b4606ad7caa2345cda3b6"
           notion_url = "https://api.notion.com/v1/pages"
